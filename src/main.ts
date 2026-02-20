@@ -1,4 +1,7 @@
-import { fetchPage } from "./http.js";
+import { fetchPage } from "./http.ts";
+import { tokenize } from "./tokenizer.ts";
+import { buildTree } from "./tree.ts";
+import { extractText } from "./render.ts";
 
 const url = process.argv[2];
 
@@ -8,4 +11,7 @@ if (!url) {
 }
 
 const html = await fetchPage(url);
-console.log(html);
+const tokens = tokenize(html);
+const tree = buildTree(tokens);
+const text = extractText(tree);
+console.log(text);

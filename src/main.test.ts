@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import { execSync } from "child_process";
 
 describe("main", () => {
-  it("URLありで実行するとHTMLが出力される", () => {
+  it("URLありで実行するとテキストが出力される", () => {
     const output = execSync("npx tsx src/main.ts https://example.com", {
       encoding: "utf-8",
     });
-    expect(output).toContain("<html");
+    expect(output).toContain("Example Domain");
   });
 
   it("URLなしで実行するとエラーメッセージを出して終了する", () => {
