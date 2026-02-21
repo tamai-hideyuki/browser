@@ -1,7 +1,4 @@
-type TextNode = {
-  type: "text";
-  content: string;
-};
+export type Node = TextNode | ElementNode;
 
 export type ElementNode = {
   type: "element";
@@ -9,7 +6,10 @@ export type ElementNode = {
   children: Node[];
 };
 
-export type Node = TextNode | ElementNode;
+type TextNode = {
+  type: "text";
+  content: string;
+};
 
 export type Token =
   | { type: "tag"; value: string }

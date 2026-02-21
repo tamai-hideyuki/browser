@@ -1,15 +1,28 @@
 import type { Token, Node, ElementNode } from "./types.ts";
 
+/**
+ * 閉じタグかどうかを判定する（
+ */
 const isClosingTag = (tagValue: string): boolean => {
   return tagValue.startsWith("/");
 };
 
+/**
+ * タグ文字列からタグ名を取り出す
+ */
 const extractTagName = (tagValue: string): string => {
   return tagValue.split(/[\s/]/)[0];
 };
 
+/**
+ * トークンの配列からツリー構造（DOM木）を組み立てる
+ */
 export const buildTree = (tokens: Token[]): Node => {
-  const root: ElementNode = { type: "element", tagName: "document", children: [] };
+  const root: ElementNode = {
+    type: "element",
+    tagName: "document",
+    children: [],
+  };
   const stack: ElementNode[] = [root];
 
   for (const token of tokens) {
