@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { fetchPage } from "./http.ts";
+import { fetchPage } from "./index.ts";
 
 describe("fetchPage", () => {
   afterEach(() => {

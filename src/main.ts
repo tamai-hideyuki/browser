@@ -1,7 +1,7 @@
-import { fetchPage } from "./http.ts";
-import { tokenize } from "./tokenizer.ts";
-import { buildTree } from "./tree.ts";
-import { extractText } from "./render.ts";
+import { fetchPage } from "./http/index.ts";
+import { tokenize } from "./tokenizer/index.ts";
+import { buildTree } from "./tree/index.ts";
+import { extractText } from "./render/index.ts";
 
 /**
  * argument vector の略

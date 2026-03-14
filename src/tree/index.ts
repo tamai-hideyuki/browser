@@ -1,4 +1,4 @@
-import type { Token, Node, ElementNode } from "./types.ts";
+import type { Token, Node, ElementNode } from "../types.ts";
 
 /**
  * 閉じタグかどうかを判定する（

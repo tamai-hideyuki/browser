@@ -1,4 +1,4 @@
-import type { Token } from "./types.ts";
+import type { Token } from "../types.ts";
 
 export const tokenize = (html: string): Token[] => {
   const tokens: Token[] = [];

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tokenize } from "./tokenizer.ts";
+import { tokenize } from "./index.ts";
 
 describe("tokenize", () => {
   it("タグとテキストをトークンに分解する", () => {

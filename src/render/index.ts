@@ -1,4 +1,4 @@
-import type { Node } from "./types.ts";
+import type { Node } from "../types.ts";
 
 const IGNORED_TAGS = new Set(["script", "style"]);
 

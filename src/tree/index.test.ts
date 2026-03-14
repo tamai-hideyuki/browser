@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { tokenize } from "./tokenizer.ts";
-import { buildTree } from "./tree.ts";
+import { tokenize } from "../tokenizer/index.ts";
+import { buildTree } from "./index.ts";
 
 describe("buildTree", () => {
   it("トークンからツリー構造を構築する", () => {
