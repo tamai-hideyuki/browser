@@ -1,16 +1,42 @@
 {
   "name": "browser",
-  "version": "1.0.0",
-  "description": "最小ブラウザ",
+  "version": "0.1.0",
+  "description": "Arc-style browser prototype",
   "type": "module",
-  "main": "src/main.ts",
+  "main": "build/main/index.cjs",
   "scripts": {
-    "start": "tsx src/main.ts"
+    "dev": "node scripts/dev.mjs",
+    "build:shell": "vite build",
+    "build:main": "esbuild src/main/index.ts --bundle --platform=node --format=cjs --target=node20 --external:electron --external:better-sqlite3 --alias:@shared=./src/shared --outfile=build/main/index.cjs",
+    "build:preload": "esbuild src/preload/index.ts --bundle --platform=node --format=cjs --target=node20 --external:electron --alias:@shared=./src/shared --outfile=build/preload/index.cjs",
+    "build": "npm run build:main && npm run build:preload && npm run build:shell",
+    "start": "electron .",
+    "package": "npm run build && electron-builder",
+    "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.shell.json --noEmit",
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.5.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.23.8",
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
-    "@types/node": "^25.3.0",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "@electron/rebuild": "^3.7.0",
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.4"
   }
 }

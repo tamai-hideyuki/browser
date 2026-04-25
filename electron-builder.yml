@@ -1,0 +1,11 @@
+appId: dev.local.browser
+productName: Browser
+directories:
+  output: dist
+files:
+  - build/**
+  - package.json
+mac:
+  category: public.app-category.utilities
+  target:
+    - dmg
