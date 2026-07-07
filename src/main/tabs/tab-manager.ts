@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { BrowserWindow, WebContentsView } from 'electron';
+import type { BrowserWindow, WebContents, WebContentsView } from 'electron';
 import { TabRepository } from '../storage/repositories/tab-repo';
 import { resolveUrl } from '../navigation/url-resolver';
 import { createWebView, type WebViewHostDeps } from './webview-host';
@@ -59,6 +59,12 @@ export class TabManager {
 
   getActiveTabId(): TabId | null {
     return this.activeTabId;
+  }
+
+  // メニューの「デベロッパーツール」から使う。view が無ければ（discard 中など）undefined
+  getActiveWebContents(): WebContents | undefined {
+    if (!this.activeTabId) return undefined;
+    return this.records.get(this.activeTabId)?.view?.webContents;
   }
 
   // ── 操作 ──────────────────────────────────────────────

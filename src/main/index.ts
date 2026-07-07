@@ -25,8 +25,6 @@ const scheduleSaveBounds = (): void => {
 };
 
 app.whenReady().then(() => {
-  Menu.setApplicationMenu(buildApplicationMenu());
-
   runMigrations();
   const defaultSpace = SpaceRepository.ensureDefault();
 
@@ -38,6 +36,11 @@ app.whenReady().then(() => {
   settingsService.init();
 
   tabManager = new TabManager(mainWindow, broadcaster, settingsService, defaultSpace.id);
+
+  // アクティブタブがあればその webContents、無ければ shell 自身を対象にする
+  Menu.setApplicationMenu(
+    buildApplicationMenu(() => tabManager?.getActiveWebContents() ?? mainWindow?.webContents),
+  );
 
   registerHandlers(tabManager, settingsService);
 
