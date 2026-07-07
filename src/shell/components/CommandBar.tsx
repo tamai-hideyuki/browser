@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useUiStore } from '../stores/ui-store';
 import { useTabsStore } from '../stores/tabs-store';
 import type { Candidate } from '@shared/types/command-bar';
-import type { TabId } from '@shared/types/tab';
 import { SearchEngines, buildSearchUrl, type SearchEngine } from '@shared/types/settings';
 
 const kindLabel = (c: Candidate): string => {
@@ -66,30 +65,27 @@ export const CommandBar = () => {
 
   if (!open) return null;
 
+  // newTab モードなら新規タブ、editUrl モードならアクティブタブで開く
+  const openOrNavigate = async (url: string) => {
+    if (mode === 'newTab' || !activeId) {
+      await useTabsStore.getState().createTab({ url });
+    } else {
+      await useTabsStore.getState().navigateTab(activeId, url);
+    }
+  };
+
   const execute = async (c: Candidate) => {
     switch (c.kind) {
       case 'open-tab':
         await useTabsStore.getState().activateTab(c.tabId);
         break;
       case 'history':
-      case 'url': {
-        const url = 'url' in c ? c.url : '';
-        if (mode === 'newTab' || !activeId) {
-          await useTabsStore.getState().createTab({ url });
-        } else {
-          await useTabsStore.getState().navigateTab(activeId, url);
-        }
+      case 'url':
+        await openOrNavigate(c.url);
         break;
-      }
-      case 'search': {
-        const url = buildSearchUrl(c.query, c.engine as SearchEngine);
-        if (mode === 'newTab' || !activeId) {
-          await useTabsStore.getState().createTab({ url });
-        } else {
-          await useTabsStore.getState().navigateTab(activeId, url);
-        }
+      case 'search':
+        await openOrNavigate(buildSearchUrl(c.query, c.engine as SearchEngine));
         break;
-      }
     }
     close();
   };
@@ -116,13 +112,8 @@ export const CommandBar = () => {
       if (sel) {
         void execute(sel);
       } else if (input.trim().length > 0) {
-        // 直接入力で実行
-        const url = input.trim();
-        if (mode === 'newTab' || !activeId) {
-          void useTabsStore.getState().createTab({ url });
-        } else {
-          void useTabsStore.getState().navigateTab(activeId as TabId, url);
-        }
+        // 候補がまだ無いときは入力値をそのまま開く
+        void openOrNavigate(input.trim());
         close();
       }
     }

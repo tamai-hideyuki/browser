@@ -1,22 +1,9 @@
 import { getDb } from '../db';
-import { rowToTab } from './_helpers';
-import type { Tab, TabId, SpaceId, TabState } from '@shared/types/tab';
-
-type InsertTabInput = {
-  id: TabId;
-  spaceId: SpaceId;
-  url: string;
-  title: string;
-  faviconUrl: string | null;
-  state: TabState;
-  position: number;
-  lastActiveAt: number;
-  createdAt: number;
-  archivedAt: number | null;
-};
+import { rowToTab, type TabRow } from './_helpers';
+import type { PersistedTab, Tab, TabId, SpaceId, TabState } from '@shared/types/tab';
 
 export const TabRepository = {
-  insert(t: InsertTabInput): void {
+  insert(t: PersistedTab): void {
     getDb().prepare(`
       INSERT INTO tabs (id, space_id, url, title, favicon_url, state, position,
                         last_active_at, created_at, archived_at)
@@ -28,7 +15,7 @@ export const TabRepository = {
   },
 
   findById(id: TabId): Tab | undefined {
-    const row = getDb().prepare('SELECT * FROM tabs WHERE id = ?').get(id) as any;
+    const row = getDb().prepare('SELECT * FROM tabs WHERE id = ?').get(id) as TabRow | undefined;
     return row ? rowToTab(row) : undefined;
   },
 
@@ -37,7 +24,7 @@ export const TabRepository = {
       SELECT * FROM tabs
       WHERE state IN ('today', 'pinned')
       ORDER BY space_id, state, position
-    `).all() as any[];
+    `).all() as TabRow[];
     return rows.map(rowToTab);
   },
 
@@ -83,7 +70,7 @@ export const TabRepository = {
       WHERE state = 'archived'
       ORDER BY archived_at DESC, last_active_at DESC
       LIMIT ?
-    `).all(limit) as any[];
+    `).all(limit) as TabRow[];
     return rows.map(rowToTab);
   },
 

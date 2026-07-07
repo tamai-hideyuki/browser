@@ -1,18 +1,19 @@
 import { randomUUID } from 'node:crypto';
-import { WebContentsView, type BrowserWindow } from 'electron';
+import type { BrowserWindow, WebContentsView } from 'electron';
 import { TabRepository } from '../storage/repositories/tab-repo';
-import { HistoryRepository } from '../storage/repositories/history-repo';
 import { resolveUrl } from '../navigation/url-resolver';
+import { createWebView, type WebViewHostDeps } from './webview-host';
 import type { Broadcaster } from '../ipc/broadcaster';
 import type { SettingsService } from '../settings/settings-service';
-import type {
-  Tab,
-  TabId,
-  SpaceId,
-  Rect,
-  CreateTabInput,
+import {
+  DEFAULT_TAB_RUNTIME,
+  type Tab,
+  type TabId,
+  type SpaceId,
+  type PersistedTab,
+  type Rect,
+  type CreateTabInput,
 } from '@shared/types/tab';
-import type { ShortcutAction } from '@shared/types/ipc';
 
 type TabRecord = {
   meta: Tab;
@@ -24,6 +25,7 @@ export class TabManager {
   private activeTabId: TabId | null = null;
   private bounds: Rect = { x: 0, y: 0, width: 0, height: 0 };
   private defaultSpaceId: SpaceId;
+  private readonly hostDeps: WebViewHostDeps;
 
   constructor(
     private window: BrowserWindow,
@@ -32,6 +34,12 @@ export class TabManager {
     defaultSpaceId: SpaceId,
   ) {
     this.defaultSpaceId = defaultSpaceId;
+    this.hostDeps = {
+      broadcaster,
+      getMeta: (id) => this.records.get(id)?.meta,
+      focusShell: () => this.window.webContents.focus(),
+      openInNewTab: (url, background) => { this.create({ url, background }); },
+    };
   }
 
   // ── 起動時復元 ─────────────────────────────────────────
@@ -57,41 +65,23 @@ export class TabManager {
     const id = randomUUID() as TabId;
     const spaceId = (input.spaceId ?? this.defaultSpaceId) as SpaceId;
     const state = input.state ?? 'today';
-    const position = TabRepository.nextPosition(spaceId, state);
     const now = Date.now();
-    const url = resolveUrl(input.url, this.settings.getAll().general.defaultSearchEngine);
 
-    const meta: Tab = {
+    const persisted: PersistedTab = {
       id,
       spaceId,
-      url,
+      url: resolveUrl(input.url, this.settings.getAll().general.defaultSearchEngine),
       title: '',
       faviconUrl: null,
       state,
-      position,
+      position: TabRepository.nextPosition(spaceId, state),
       lastActiveAt: now,
       createdAt: now,
       archivedAt: null,
-      loading: false,
-      loadProgress: 0,
-      audible: false,
-      canGoBack: false,
-      canGoForward: false,
     };
+    const meta: Tab = { ...persisted, ...DEFAULT_TAB_RUNTIME };
 
-    TabRepository.insert({
-      id,
-      spaceId,
-      url,
-      title: '',
-      faviconUrl: null,
-      state,
-      position,
-      lastActiveAt: now,
-      createdAt: now,
-      archivedAt: null,
-    });
-
+    TabRepository.insert(persisted);
     this.records.set(id, { meta, view: null });
     this.broadcaster.emit({ kind: 'tab.created', tab: meta });
 
@@ -108,11 +98,7 @@ export class TabManager {
 
     if (this.activeTabId && this.activeTabId !== tabId) {
       const prev = this.records.get(this.activeTabId);
-      if (prev?.view) {
-        try {
-          this.window.contentView.removeChildView(prev.view);
-        } catch {}
-      }
+      if (prev?.view) this.detachView(prev.view);
     }
 
     if (!rec.view) {
@@ -136,8 +122,8 @@ export class TabManager {
     if (!rec) return;
 
     if (rec.view) {
-      try { this.window.contentView.removeChildView(rec.view); } catch {}
-      try { (rec.view.webContents as any).close?.(); } catch {}
+      this.detachView(rec.view);
+      try { rec.view.webContents.close(); } catch { /* 破棄済みなら無視 */ }
       rec.view = null;
     }
 
@@ -205,23 +191,11 @@ export class TabManager {
   }
 
   pin(tabId: TabId): void {
-    const rec = this.records.get(tabId);
-    if (!rec || rec.meta.state === 'pinned') return;
-    const newPosition = TabRepository.nextPosition(rec.meta.spaceId, 'pinned');
-    rec.meta.state = 'pinned';
-    rec.meta.position = newPosition;
-    TabRepository.setState(tabId, 'pinned', newPosition);
-    this.broadcaster.emit({ kind: 'tab.updated', tab: rec.meta });
+    this.setTabState(tabId, 'pinned', (meta) => meta.state !== 'pinned');
   }
 
   unpin(tabId: TabId): void {
-    const rec = this.records.get(tabId);
-    if (!rec || rec.meta.state !== 'pinned') return;
-    const newPosition = TabRepository.nextPosition(rec.meta.spaceId, 'today');
-    rec.meta.state = 'today';
-    rec.meta.position = newPosition;
-    TabRepository.setState(tabId, 'today', newPosition);
-    this.broadcaster.emit({ kind: 'tab.updated', tab: rec.meta });
+    this.setTabState(tabId, 'today', (meta) => meta.state === 'pinned');
   }
 
   listArchived(limit?: number): Tab[] {
@@ -254,136 +228,25 @@ export class TabManager {
   private mountView(tabId: TabId): void {
     const rec = this.records.get(tabId);
     if (!rec || rec.view) return;
-
-    const view = new WebContentsView({
-      webPreferences: {
-        sandbox: true,
-        contextIsolation: true,
-        nodeIntegration: false,
-        webSecurity: true,
-      },
-    });
-
-    rec.view = view;
-    this.wireWebContentsEvents(tabId, view);
-    view.webContents.loadURL(rec.meta.url).catch(() => {});
+    rec.view = createWebView(tabId, rec.meta.url, this.hostDeps);
   }
 
-  private wireWebContentsEvents(tabId: TabId, view: WebContentsView): void {
-    const wc = view.webContents;
+  // View が既にウィンドウから外れていても安全に取り除く
+  private detachView(view: WebContentsView): void {
+    try { this.window.contentView.removeChildView(view); } catch { /* 未アタッチなら無視 */ }
+  }
 
-    wc.on('did-start-loading', () => {
-      this.broadcaster.emit({
-        kind: 'tab.loadingStateChanged',
-        tabId,
-        loading: true,
-        progress: 0,
-      });
-    });
-
-    wc.on('did-stop-loading', () => {
-      this.broadcaster.emit({
-        kind: 'tab.loadingStateChanged',
-        tabId,
-        loading: false,
-        progress: 1,
-      });
-    });
-
-    wc.on('page-title-updated', (_e, title) => {
-      const rec = this.records.get(tabId);
-      if (!rec) return;
-      rec.meta.title = title;
-      try { TabRepository.updateTitle(tabId, title); } catch {}
-      try { HistoryRepository.updateTitleByUrl(rec.meta.url, title); } catch {}
-      this.broadcaster.emit({ kind: 'tab.titleUpdated', tabId, title });
-    });
-
-    wc.on('page-favicon-updated', (_e, urls) => {
-      const url = urls[0] ?? null;
-      const rec = this.records.get(tabId);
-      if (!rec) return;
-      rec.meta.faviconUrl = url;
-      try { TabRepository.updateFavicon(tabId, url); } catch {}
-      this.broadcaster.emit({ kind: 'tab.faviconUpdated', tabId, faviconUrl: url });
-    });
-
-    wc.on('did-navigate', (_e, url) => {
-      const rec = this.records.get(tabId);
-      if (!rec) return;
-      rec.meta.url = url;
-      try { TabRepository.updateUrl(tabId, url); } catch {}
-      if (!url.startsWith('about:') && !url.startsWith('chrome:') && !url.startsWith('data:')) {
-        try { HistoryRepository.record(url, rec.meta.title, Date.now()); } catch {}
-      }
-      this.broadcaster.emit({
-        kind: 'tab.urlUpdated',
-        tabId,
-        url,
-        canGoBack: wc.navigationHistory.canGoBack(),
-        canGoForward: wc.navigationHistory.canGoForward(),
-      });
-    });
-
-    wc.on('did-navigate-in-page', (_e, url) => {
-      const rec = this.records.get(tabId);
-      if (!rec) return;
-      rec.meta.url = url;
-      this.broadcaster.emit({
-        kind: 'tab.urlUpdated',
-        tabId,
-        url,
-        canGoBack: wc.navigationHistory.canGoBack(),
-        canGoForward: wc.navigationHistory.canGoForward(),
-      });
-    });
-
-    wc.on('did-fail-load', (_e, errorCode, _desc, validatedURL, isMainFrame) => {
-      if (!isMainFrame) return;
-      if (errorCode === -3) return;
-      this.broadcaster.emit({
-        kind: 'navigation.error',
-        tabId,
-        errorCode: String(errorCode),
-        url: validatedURL,
-      });
-    });
-
-    wc.on('before-input-event', (event, input) => {
-      if (input.type !== 'keyDown') return;
-      const isMac = process.platform === 'darwin';
-      const meta = isMac ? input.meta : input.control;
-      if (!meta) return;
-
-      const k = input.key.toLowerCase();
-      let action: ShortcutAction | null = null;
-      if (k === 't') action = 'newTab';
-      else if (k === 'l') action = 'editUrl';
-      else if (k === 'w') action = 'closeTab';
-      else if (k === 'r') action = input.shift ? 'reloadHard' : 'reload';
-      else if (k === '[') action = 'back';
-      else if (k === ']') action = 'forward';
-      else if (k === ',') action = 'openSettings';
-
-      if (action) {
-        event.preventDefault();
-        // shell の UI を出す系のショートカットは shell webContents にフォーカスを戻す
-        // （webview が握っているフォーカスを奪わないと入力欄に打てない）
-        if (action === 'newTab' || action === 'editUrl' || action === 'openSettings') {
-          this.window.webContents.focus();
-        }
-        this.broadcaster.emit({ kind: 'shortcut', action });
-      }
-    });
-
-    wc.setWindowOpenHandler(({ url, disposition }) => {
-      // save-to-disk は Electron の型に出ないが実行時に来うる
-      if ((disposition as string) === 'save-to-disk') return { action: 'allow' };
-      this.create({
-        url,
-        background: disposition === 'background-tab',
-      });
-      return { action: 'deny' };
-    });
+  private setTabState(
+    tabId: TabId,
+    state: 'today' | 'pinned',
+    shouldApply: (meta: Tab) => boolean,
+  ): void {
+    const rec = this.records.get(tabId);
+    if (!rec || !shouldApply(rec.meta)) return;
+    const newPosition = TabRepository.nextPosition(rec.meta.spaceId, state);
+    rec.meta.state = state;
+    rec.meta.position = newPosition;
+    TabRepository.setState(tabId, state, newPosition);
+    this.broadcaster.emit({ kind: 'tab.updated', tab: rec.meta });
   }
 }

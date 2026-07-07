@@ -8,6 +8,7 @@ import { ArchiveModal } from './components/ArchiveModal';
 import { useUiStore } from './stores/ui-store';
 import { useTabsStore } from './stores/tabs-store';
 import { useSettingsStore } from './stores/settings-store';
+import { matchShortcut } from '@shared/shortcuts';
 import type { Theme } from '@shared/types/settings';
 import type { ShortcutAction } from '@shared/types/ipc';
 
@@ -60,16 +61,11 @@ export const App = () => {
   // shell renderer 自身でのキーボード（フォーカスが shell にあるとき）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const meta = isMac() ? e.metaKey : e.ctrlKey;
-      let action: ShortcutAction | null = null;
-      if (meta && e.key === 't') action = 'newTab';
-      else if (meta && e.key === 'l') action = 'editUrl';
-      else if (meta && e.key === 'w') action = 'closeTab';
-      else if (meta && e.key === 'r') action = e.shiftKey ? 'reloadHard' : 'reload';
-      else if (meta && e.key === '[') action = 'back';
-      else if (meta && e.key === ']') action = 'forward';
-      else if (meta && e.key === ',') action = 'openSettings';
-      else if (e.key === 'Escape') action = 'escape';
+      const action = matchShortcut({
+        key: e.key,
+        meta: isMac() ? e.metaKey : e.ctrlKey,
+        shift: e.shiftKey,
+      });
 
       if (e.key === 'Escape') {
         // モーダル類も閉じる

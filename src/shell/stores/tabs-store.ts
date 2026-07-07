@@ -30,7 +30,8 @@ export const useTabsStore = create<State & Actions>((set, get) => ({
   },
 
   async activateTab(tabId) {
-    set({ activeTabId: tabId });
+    // activeTabId の反映は main から届く 'tab.activated' イベントに任せる
+    // （不変条件: store は IPC イベント以外でタブ状態を変更しない）
     await window.api.invoke('tab.activate', { tabId });
   },
 

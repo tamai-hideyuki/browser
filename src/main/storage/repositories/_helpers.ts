@@ -1,8 +1,7 @@
-import type { Tab, TabId, SpaceId } from '@shared/types/tab';
+import { DEFAULT_TAB_RUNTIME, type Tab, type TabId, type SpaceId } from '@shared/types/tab';
 import type { Space } from '@shared/types/space';
 
-
-type TabRow = {
+export type TabRow = {
   id: string;
   space_id: string;
   url: string;
@@ -26,14 +25,10 @@ export const rowToTab = (row: TabRow): Tab => ({
   lastActiveAt: row.last_active_at,
   createdAt: row.created_at,
   archivedAt: row.archived_at,
-  loading: false,
-  loadProgress: 0,
-  audible: false,
-  canGoBack: false,
-  canGoForward: false,
+  ...DEFAULT_TAB_RUNTIME,
 });
 
-type SpaceRow = {
+export type SpaceRow = {
   id: string;
   name: string;
   icon: string | null;

@@ -3,10 +3,8 @@ import type { TabManager } from '../tabs/tab-manager';
 import type { SettingsService } from '../settings/settings-service';
 import { SpaceRepository } from '../storage/repositories/space-repo';
 import { HistoryRepository } from '../storage/repositories/history-repo';
-import { resolveUrl } from '../navigation/url-resolver';
+import { searchCandidates } from '../command-bar/search';
 import type { Commands } from '@shared/types/ipc';
-import type { Candidate } from '@shared/types/command-bar';
-import type { TabId } from '@shared/types/tab';
 
 type Handler<K extends keyof Commands> = (
   input: Commands[K]['input']
@@ -19,13 +17,11 @@ const register = <K extends keyof Commands>(channel: K, handler: Handler<K>): vo
 export const registerHandlers = (tabs: TabManager, settings: SettingsService): void => {
   register('bootstrap.fetch', () => {
     const spaces = SpaceRepository.list();
-    const allTabs = tabs.allOpenTabs();
-    const activeTabId = tabs.getActiveTabId();
     return {
       spaces,
       activeSpaceId: spaces[0]?.id ?? null,
-      tabs: allTabs,
-      activeTabId,
+      tabs: tabs.allOpenTabs(),
+      activeTabId: tabs.getActiveTabId(),
       settings: settings.getAll(),
     };
   });
@@ -51,80 +47,11 @@ export const registerHandlers = (tabs: TabManager, settings: SettingsService): v
 
   register('history.search', ({ query, limit }) => HistoryRepository.search(query, limit ?? 20));
 
-  register('commandBar.search', ({ query }) => {
-    const q = query.trim();
-    const candidates: Candidate[] = [];
-
-    if (q.length === 0) {
-      const recent = HistoryRepository.recent(8);
-      for (const h of recent) {
-        candidates.push({
-          kind: 'history',
-          id: `history:${h.id}`,
-          url: h.url,
-          title: h.title,
-          favicon: null,
-          visitedAt: h.visitedAt,
-          score: 0.5,
-        });
-      }
-      return candidates;
-    }
-
-    // open tabs (in-memory)
-    const lower = q.toLowerCase();
-    for (const tab of tabs.allOpenTabs()) {
-      const t = (tab.title || '').toLowerCase();
-      const u = tab.url.toLowerCase();
-      if (t.includes(lower) || u.includes(lower)) {
-        candidates.push({
-          kind: 'open-tab',
-          id: `open:${tab.id}`,
-          tabId: tab.id as TabId,
-          title: tab.title || tab.url,
-          url: tab.url,
-          favicon: tab.faviconUrl,
-          score: t.startsWith(lower) || u.startsWith(lower) ? 1 : 0.8,
-        });
-      }
-    }
-
-    // history
-    const hits = HistoryRepository.search(q, 10);
-    for (const h of hits) {
-      candidates.push({
-        kind: 'history',
-        id: `history:${h.id}`,
-        url: h.url,
-        title: h.title,
-        favicon: null,
-        visitedAt: h.visitedAt,
-        score: 0.6,
-      });
-    }
-
-    const engine = settings.getAll().general.defaultSearchEngine;
-
-    // url fallback
-    const looksUrl = /^[a-z]+:\/\//i.test(q) || /\.[a-z]{2,}/i.test(q) || /^localhost/i.test(q);
-    if (looksUrl) {
-      candidates.push({
-        kind: 'url',
-        id: `url:${q}`,
-        url: resolveUrl(q, engine),
-        score: 0.5,
-      });
-    }
-
-    // search fallback
-    candidates.push({
-      kind: 'search',
-      id: `search:${q}`,
-      query: q,
-      engine,
-      score: 0.3,
-    });
-
-    return candidates.sort((a, b) => b.score - a.score).slice(0, 8);
-  });
+  register('commandBar.search', ({ query }) =>
+    searchCandidates(query, {
+      openTabs: tabs.allOpenTabs(),
+      engine: settings.getAll().general.defaultSearchEngine,
+      recentHistory: (limit) => HistoryRepository.recent(limit),
+      searchHistory: (q, limit) => HistoryRepository.search(q, limit),
+    }));
 };

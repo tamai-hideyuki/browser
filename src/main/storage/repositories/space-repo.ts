@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db';
-import { rowToSpace } from './_helpers';
+import { rowToSpace, type SpaceRow } from './_helpers';
 import type { Space } from '@shared/types/space';
 import type { SpaceId } from '@shared/types/tab';
 
 export const SpaceRepository = {
   list(): Space[] {
-    const rows = getDb().prepare('SELECT * FROM spaces ORDER BY position ASC').all() as any[];
+    const rows = getDb().prepare('SELECT * FROM spaces ORDER BY position ASC').all() as SpaceRow[];
     return rows.map(rowToSpace);
   },
 

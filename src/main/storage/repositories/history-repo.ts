@@ -26,34 +26,23 @@ export const HistoryRepository = {
       .map((t) => `"${t}"*`)
       .join(' ');
     if (tokens.length === 0) return [];
-    const rows = getDb().prepare(`
+    // SELECT で HistoryEntry と同じキー名に揃えているためそのまま返せる
+    return getDb().prepare(`
       SELECT h.id, h.url, h.title, h.visited_at AS visitedAt
       FROM history_fts
       JOIN history h ON h.id = history_fts.rowid
       WHERE history_fts MATCH ?
       ORDER BY bm25(history_fts), h.visited_at DESC
       LIMIT ?
-    `).all(tokens, limit) as any[];
-    return rows.map((r) => ({
-      id: r.id,
-      url: r.url,
-      title: r.title,
-      visitedAt: r.visitedAt,
-    }));
+    `).all(tokens, limit) as HistoryEntry[];
   },
 
   recent(limit = 50): HistoryEntry[] {
-    const rows = getDb().prepare(`
+    return getDb().prepare(`
       SELECT id, url, title, visited_at AS visitedAt
       FROM history
       ORDER BY visited_at DESC
       LIMIT ?
-    `).all(limit) as any[];
-    return rows.map((r) => ({
-      id: r.id,
-      url: r.url,
-      title: r.title,
-      visitedAt: r.visitedAt,
-    }));
+    `).all(limit) as HistoryEntry[];
   },
 };
