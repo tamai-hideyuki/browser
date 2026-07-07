@@ -57,6 +57,7 @@ export type Events =
   | { kind: 'tab.updated';              tab: Tab }
   | { kind: 'tab.loadingStateChanged';  tabId: TabId; loading: boolean; progress: number }
   | { kind: 'navigation.error';         tabId: TabId; errorCode: string; url: string }
+  | { kind: 'tab.crashed';              tabId: TabId; reason: string }
   | { kind: 'settings.updated';         settings: Settings }
   | { kind: 'shortcut';                 action: ShortcutAction };
 

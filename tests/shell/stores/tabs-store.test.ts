@@ -9,7 +9,7 @@ beforeEach(async () => {
   api = installMockApi();
   const mod = await import('../../../src/shell/stores/tabs-store');
   useTabsStoreCached = mod.useTabsStore;
-  mod.useTabsStore.setState({ byId: {}, activeTabId: null });
+  mod.useTabsStore.setState({ byId: {}, activeTabId: null, errorsByTabId: {} });
 });
 
 const makeTab = (overrides: Partial<Tab> = {}): Tab => ({
@@ -311,6 +311,98 @@ describe('tabsStore', () => {
 
       // 結果
       expect(getTab('fresh').id).toBe('fresh');
+    });
+  });
+
+  describe('applyEvent("navigation.error") を受けたとき', () => {
+    it('該当タブのエラー状態に設定される', async () => {
+      // 準備
+      const { useTabsStore } = await import('../../../src/shell/stores/tabs-store');
+      useTabsStore.getState().hydrate([makeTab({ id: 'a' as TabId })], 'a' as TabId);
+
+      // 実行
+      useTabsStore.getState().applyEvent({
+        kind: 'navigation.error',
+        tabId: 'a' as TabId,
+        errorCode: '-105',
+        url: 'https://example.com',
+      });
+
+      // 結果
+      expect(useTabsStore.getState().errorsByTabId['a']).toEqual({
+        kind: 'navigation',
+        errorCode: '-105',
+        url: 'https://example.com',
+      });
+    });
+  });
+
+  describe('applyEvent("tab.crashed") を受けたとき', () => {
+    it('該当タブのエラー状態に設定される', async () => {
+      // 準備
+      const { useTabsStore } = await import('../../../src/shell/stores/tabs-store');
+      useTabsStore.getState().hydrate([makeTab({ id: 'a' as TabId })], 'a' as TabId);
+
+      // 実行
+      useTabsStore.getState().applyEvent({ kind: 'tab.crashed', tabId: 'a' as TabId, reason: 'crashed' });
+
+      // 結果
+      expect(useTabsStore.getState().errorsByTabId['a']).toEqual({ kind: 'crash', reason: 'crashed' });
+    });
+  });
+
+  describe('エラー表示中のタブが読み込みを開始したとき', () => {
+    it('直前のエラー状態が消える', async () => {
+      // 準備: まずエラー状態にしておく
+      const { useTabsStore } = await import('../../../src/shell/stores/tabs-store');
+      useTabsStore.getState().hydrate([makeTab({ id: 'a' as TabId })], 'a' as TabId);
+      useTabsStore.getState().applyEvent({ kind: 'tab.crashed', tabId: 'a' as TabId, reason: 'crashed' });
+      expect(useTabsStore.getState().errorsByTabId['a']).toBeDefined();
+
+      // 実行: 再読込などで新しい読み込みが始まる
+      useTabsStore.getState().applyEvent({
+        kind: 'tab.loadingStateChanged',
+        tabId: 'a' as TabId,
+        loading: true,
+        progress: 0,
+      });
+
+      // 結果
+      expect(useTabsStore.getState().errorsByTabId['a']).toBeUndefined();
+    });
+
+    it('エラーが無いタブの読み込み開始では何も起きない', async () => {
+      // 準備
+      const { useTabsStore } = await import('../../../src/shell/stores/tabs-store');
+      useTabsStore.getState().hydrate([makeTab({ id: 'a' as TabId })], 'a' as TabId);
+
+      // 実行
+      useTabsStore.getState().applyEvent({
+        kind: 'tab.loadingStateChanged',
+        tabId: 'a' as TabId,
+        loading: true,
+        progress: 0,
+      });
+
+      // 結果
+      expect(getTab('a').loading).toBe(true);
+      expect(useTabsStore.getState().errorsByTabId['a']).toBeUndefined();
+    });
+  });
+
+  describe('エラー状態のタブが applyEvent("tab.closed") を受けたとき', () => {
+    it('byId だけでなくエラー状態も削除される', async () => {
+      // 準備
+      const { useTabsStore } = await import('../../../src/shell/stores/tabs-store');
+      useTabsStore.getState().hydrate([makeTab({ id: 'a' as TabId })], 'a' as TabId);
+      useTabsStore.getState().applyEvent({ kind: 'tab.crashed', tabId: 'a' as TabId, reason: 'crashed' });
+
+      // 実行
+      useTabsStore.getState().applyEvent({ kind: 'tab.closed', tabId: 'a' as TabId });
+
+      // 結果
+      expect(useTabsStore.getState().byId['a']).toBeUndefined();
+      expect(useTabsStore.getState().errorsByTabId['a']).toBeUndefined();
     });
   });
 });

@@ -42,12 +42,14 @@ const dispatchShortcut = (action: ShortcutAction): void => {
 
 export const App = () => {
   const theme = useSettingsStore((s) => s.settings.appearance.theme);
-  const overlayOpen = useUiStore((s) => s.commandBar.open || s.settingsOpen);
+  const overlayOpen = useUiStore((s) => s.commandBar.open || s.settingsOpen || s.archiveOpen);
+  const activeTabHasError = useTabsStore((s) => !!(s.activeTabId && s.errorsByTabId[s.activeTabId]));
 
-  // オーバーレイ表示中は webview を隠す（webview は常に DOM の上に乗るため）
+  // オーバーレイ表示中・エラー表示中は webview を隠す
+  // （webview は常に shell の DOM の上に乗るネイティブビューなので、隠さないと下の UI が見えない）
   useEffect(() => {
-    window.api.invoke('tab.setActiveViewVisible', { visible: !overlayOpen });
-  }, [overlayOpen]);
+    window.api.invoke('tab.setActiveViewVisible', { visible: !overlayOpen && !activeTabHasError });
+  }, [overlayOpen, activeTabHasError]);
 
   // テーマ適用
   useEffect(() => {

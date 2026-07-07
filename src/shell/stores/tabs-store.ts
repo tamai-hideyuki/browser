@@ -2,9 +2,17 @@ import { create } from 'zustand';
 import type { Tab, TabId, CreateTabInput } from '@shared/types/tab';
 import type { Events } from '@shared/types/ipc';
 
+// アクティブタブの WebView に重ねて表示するエラーの内容。
+// どちらも「タブの中身が見れない」状態という意味では同じ扱いだが、
+// 原因（ナビゲーション失敗 / レンダラークラッシュ）でメッセージを出し分ける。
+export type TabError =
+  | { kind: 'navigation'; errorCode: string; url: string }
+  | { kind: 'crash'; reason: string };
+
 type State = {
   byId: Record<string, Tab>;
   activeTabId: TabId | null;
+  errorsByTabId: Record<string, TabError>;
 };
 
 type Actions = {
@@ -24,6 +32,7 @@ type Actions = {
 export const useTabsStore = create<State & Actions>((set, get) => ({
   byId: {},
   activeTabId: null,
+  errorsByTabId: {},
 
   async createTab(input) {
     return window.api.invoke('tab.create', input);
@@ -81,8 +90,9 @@ export const useTabsStore = create<State & Actions>((set, get) => ({
       }
       case 'tab.closed': {
         set((s) => {
-          const { [event.tabId]: _removed, ...rest } = s.byId;
-          return { byId: rest };
+          const { [event.tabId]: _removedTab, ...restById } = s.byId;
+          const { [event.tabId]: _removedError, ...restErrors } = s.errorsByTabId;
+          return { byId: restById, errorsByTabId: restErrors };
         });
         break;
       }
@@ -119,10 +129,34 @@ export const useTabsStore = create<State & Actions>((set, get) => ({
       case 'tab.loadingStateChanged': {
         const cur = get().byId[event.tabId];
         if (!cur) break;
-        set((s) => ({
-          byId: {
+        set((s) => {
+          const byId = {
             ...s.byId,
             [event.tabId]: { ...cur, loading: event.loading, loadProgress: event.progress },
+          };
+          // 新しい読み込みが始まったら、直前に表示していたエラーは消す
+          if (!event.loading || !(event.tabId in s.errorsByTabId)) {
+            return { byId };
+          }
+          const { [event.tabId]: _removedError, ...restErrors } = s.errorsByTabId;
+          return { byId, errorsByTabId: restErrors };
+        });
+        break;
+      }
+      case 'navigation.error': {
+        set((s) => ({
+          errorsByTabId: {
+            ...s.errorsByTabId,
+            [event.tabId]: { kind: 'navigation', errorCode: event.errorCode, url: event.url },
+          },
+        }));
+        break;
+      }
+      case 'tab.crashed': {
+        set((s) => ({
+          errorsByTabId: {
+            ...s.errorsByTabId,
+            [event.tabId]: { kind: 'crash', reason: event.reason },
           },
         }));
         break;

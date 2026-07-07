@@ -12,6 +12,10 @@ export type WebViewHostDeps = {
   getMeta(tabId: TabId): Tab | undefined;
   focusShell(): void;
   openInNewTab(url: string, background: boolean): void;
+  // レンダラープロセスがクラッシュしたので view を破棄してほしい、という TabManager への通知。
+  // crashedView は「今まさに死んだ view」の参照。既に close()/reload() で入れ替わった
+  // view に対する遅延イベントを無視するために比較用として渡す。
+  onCrashed(tabId: TabId, crashedView: WebContentsView): void;
 };
 
 // タブ 1 つ分の WebContentsView を生成し、webContents イベントを配線して返す
@@ -110,6 +114,14 @@ const wireWebContentsEvents = (
       errorCode: String(errorCode),
       url: validatedURL,
     });
+  });
+
+  wc.on('render-process-gone', (_e, details) => {
+    // 'clean-exit' は tab.close() 等でこちらが意図的に webContents を破棄した場合にも
+    // 発火しうるため、実際のクラッシュ（crashed/oom/killed 等）だけを対象にする
+    if (details.reason === 'clean-exit') return;
+    broadcaster.emit({ kind: 'tab.crashed', tabId, reason: details.reason });
+    deps.onCrashed(tabId, view);
   });
 
   wc.on('before-input-event', (event, input) => {

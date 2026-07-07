@@ -1,8 +1,9 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 import { runMigrations } from './storage/migrations/runner';
 import { closeDb } from './storage/db';
 import { SpaceRepository } from './storage/repositories/space-repo';
 import { createMainWindow, getCurrentBounds } from './window/main-window';
+import { buildApplicationMenu } from './window/menu';
 import { TabManager } from './tabs/tab-manager';
 import { Broadcaster } from './ipc/broadcaster';
 import { registerHandlers } from './ipc/handlers';
@@ -24,6 +25,8 @@ const scheduleSaveBounds = (): void => {
 };
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(buildApplicationMenu());
+
   runMigrations();
   const defaultSpace = SpaceRepository.ensureDefault();
 

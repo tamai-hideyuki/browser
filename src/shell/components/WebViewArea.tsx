@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useTabsStore } from '../stores/tabs-store';
+import { ErrorOverlay } from './ErrorOverlay';
 
 export const WebViewArea = () => {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -37,6 +38,7 @@ export const WebViewArea = () => {
           Cmd+T で新規タブを開く
         </div>
       )}
+      <ErrorOverlay />
     </div>
   );
 };

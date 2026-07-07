@@ -39,6 +39,7 @@ export class TabManager {
       getMeta: (id) => this.records.get(id)?.meta,
       focusShell: () => this.window.webContents.focus(),
       openInNewTab: (url, background) => { this.create({ url, background }); },
+      onCrashed: (id, crashedView) => this.handleCrash(id, crashedView),
     };
   }
 
@@ -222,6 +223,16 @@ export class TabManager {
     if (!this.activeTabId) return;
     const rec = this.records.get(this.activeTabId);
     rec?.view?.setVisible(visible);
+  }
+
+  // レンダラープロセスのクラッシュ通知を受けて view を手放す。
+  // 次に activate/reload されたときに mountView が新しい view を作り直す。
+  private handleCrash(tabId: TabId, crashedView: WebContentsView): void {
+    const rec = this.records.get(tabId);
+    // close() 等で既に入れ替わった view に対する遅延イベントは無視する
+    if (!rec || rec.view !== crashedView) return;
+    this.detachView(crashedView);
+    rec.view = null;
   }
 
   // ── 内部 ──────────────────────────────────────────────
