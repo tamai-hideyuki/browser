@@ -13,7 +13,7 @@ let mainWindow: BrowserWindow | null = null;
 let tabManager: TabManager | null = null;
 let saveBoundsTimer: NodeJS.Timeout | null = null;
 
-function scheduleSaveBounds() {
+const scheduleSaveBounds = (): void => {
   if (!mainWindow) return;
   if (saveBoundsTimer) clearTimeout(saveBoundsTimer);
   saveBoundsTimer = setTimeout(() => {
@@ -21,7 +21,7 @@ function scheduleSaveBounds() {
     const bounds = getCurrentBounds(mainWindow);
     if (bounds) saveBootstrap({ windowBounds: bounds });
   }, 500);
-}
+};
 
 app.whenReady().then(() => {
   runMigrations();
