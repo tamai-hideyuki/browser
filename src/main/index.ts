@@ -10,9 +10,10 @@ import { registerHandlers } from './ipc/handlers';
 import { SettingsService } from './settings/settings-service';
 import { loadBootstrap, saveBootstrap } from './settings/bootstrap-settings';
 
+// 後で中身を差し替える必要があるため let を使用している
 let mainWindow: BrowserWindow | null = null;
-let tabManager: TabManager | null = null;
 let saveBoundsTimer: NodeJS.Timeout | null = null;
+let tabManager: TabManager | null = null;
 
 const scheduleSaveBounds = (): void => {
   if (!mainWindow) return;
