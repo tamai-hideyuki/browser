@@ -63,7 +63,7 @@ describe('searchCandidates', () => {
     });
   });
 
-  describe('開いているタブのマッチング', () => {
+  describe('開いているタブにマッチする文字列を入力したとき', () => {
     it('タイトルか URL に部分一致したタブが候補に入る', () => {
       // 準備
       const deps = makeDeps({
@@ -101,7 +101,7 @@ describe('searchCandidates', () => {
     });
   });
 
-  describe('URL らしい入力のとき', () => {
+  describe('URL らしい文字列を入力したとき', () => {
     it('url 候補が追加され、スキームが補完される', () => {
       // 準備
       const deps = makeDeps();
@@ -113,8 +113,10 @@ describe('searchCandidates', () => {
       const urlCand = result.find((c) => c.kind === 'url');
       expect(urlCand).toMatchObject({ url: 'https://example.com' });
     });
+  });
 
-    it('ただの単語なら url 候補は出ない', () => {
+  describe('URL らしくない単語を入力したとき', () => {
+    it('url 候補は追加されない', () => {
       // 準備
       const deps = makeDeps();
 
@@ -126,8 +128,8 @@ describe('searchCandidates', () => {
     });
   });
 
-  describe('検索フォールバック', () => {
-    it('どんなクエリでも search 候補が必ず末尾側に入る', () => {
+  describe('どんなクエリを入力しても', () => {
+    it('search 候補が必ず末尾に含まれる', () => {
       // 準備
       const deps = makeDeps({ engine: 'duckduckgo' });
 
@@ -141,8 +143,8 @@ describe('searchCandidates', () => {
     });
   });
 
-  describe('件数と並び', () => {
-    it('スコア降順に並び、最大 8 件に切り詰める', () => {
+  describe('候補が 8 件を超えるとき', () => {
+    it('スコア降順に並べたうえで上位 8 件に絞られる', () => {
       // 準備: open-tab 5 + history 10 + search 1 = 16 候補
       const deps = makeDeps({
         openTabs: Array.from({ length: 5 }, (_, i) =>
